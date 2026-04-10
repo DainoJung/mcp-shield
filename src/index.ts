@@ -53,6 +53,9 @@ export {
   RateLimiter,
   type RateLimitConfig,
 } from "./middleware/rate-limiter.js";
+export { MetricsCollector, type MetricLabels } from "./metrics/collector.js";
+export { createMetricsMiddleware } from "./metrics/middleware.js";
+export { createMetricsServer } from "./metrics/server.js";
 export type { MiddlewareFn, MiddlewareContext, NextFn } from "./middleware/types.js";
 
 export { BUILT_IN_DEFAULTS, mergeConfigs, type ResolvedToolConfig } from "./config/defaults.js";
