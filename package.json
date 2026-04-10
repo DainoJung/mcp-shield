@@ -1,9 +1,9 @@
 {
-  "name": "mcp-shield",
-  "version": "0.6.0",
+  "name": "@daino/mcp-shield",
+  "version": "1.1.0",
   "description": "Production-grade resilience middleware for MCP servers — timeout, retry, circuit breaker.",
   "bin": {
-    "mcp-shield": "./dist/cli.js"
+    "mcp-shield": "./dist/cli.mjs"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

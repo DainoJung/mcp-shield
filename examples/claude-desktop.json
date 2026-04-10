@@ -3,7 +3,7 @@
     "github": {
       "command": "npx",
       "args": [
-        "mcp-shield", "wrap",
+        "@daino/mcp-shield", "wrap",
         "--timeout", "30s",
         "--retries", "3",
         "--",
@@ -16,7 +16,7 @@
     "filesystem": {
       "command": "npx",
       "args": [
-        "mcp-shield", "wrap",
+        "@daino/mcp-shield", "wrap",
         "--timeout", "10s",
         "--retries", "1",
         "--",

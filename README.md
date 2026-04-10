@@ -33,13 +33,13 @@ Agent ←→ mcp-shield ←→ MCP Server
 
 ```bash
 # Wrap any MCP server with sensible defaults (30s timeout, 2 retries)
-npx mcp-shield wrap -- npx @modelcontextprotocol/server-github
+npx @daino/mcp-shield wrap -- npx @modelcontextprotocol/server-github
 
 # Custom timeout and retries
-npx mcp-shield wrap --timeout 60s --retries 5 -- npx server-github
+npx @daino/mcp-shield wrap --timeout 60s --retries 5 -- npx server-github
 
 # Using a config file
-npx mcp-shield wrap --config mcp-shield.yaml --server github
+npx @daino/mcp-shield wrap --config mcp-shield.yaml --server github
 ```
 
 ## Claude Desktop Integration
@@ -52,7 +52,7 @@ Add mcp-shield to your `claude_desktop_config.json`:
     "github": {
       "command": "npx",
       "args": [
-        "mcp-shield", "wrap",
+        "@daino/mcp-shield", "wrap",
         "--timeout", "30s",
         "--retries", "3",
         "--",
@@ -164,7 +164,7 @@ Use `--log-format pretty` for human-readable output during development.
 ## Programmatic Usage
 
 ```typescript
-import { shield } from 'mcp-shield';
+import { shield } from '@daino/mcp-shield';
 
 const proxy = shield({
   command: 'npx',
