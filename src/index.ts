@@ -53,6 +53,7 @@ export {
   RateLimiter,
   type RateLimitConfig,
 } from "./middleware/rate-limiter.js";
+export { MultiServerProxy, type ServerEntry } from "./proxy/multi-server-proxy.js";
 export { MetricsCollector, type MetricLabels } from "./metrics/collector.js";
 export { createMetricsMiddleware } from "./metrics/middleware.js";
 export { createMetricsServer } from "./metrics/server.js";
