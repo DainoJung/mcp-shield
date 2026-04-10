@@ -190,11 +190,11 @@ const server = shield({
 ## Roadmap
 
 - [x] **v0.1** — Timeout + Retry + Circuit Breaker + Logging
-- [ ] **v0.2** — Response Validation (schema check on tool responses)
-- [ ] **v0.3** — Tool Filtering (expose only specific tools)
-- [ ] **v0.4** — Rate Limiting (per-tool call caps)
-- [ ] **v0.5** — Metrics Export (Prometheus / OpenTelemetry)
-- [ ] **v0.6** — Multi-server Composition
+- [x] **v0.2** — Response Validation (schema check on tool responses)
+- [x] **v0.3** — Tool Filtering (expose only specific tools)
+- [x] **v0.4** — Rate Limiting (per-tool call caps)
+- [x] **v0.5** — Metrics Export (Prometheus-compatible `/metrics` endpoint)
+- [x] **v0.6** — Multi-server Composition
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 {
   "name": "mcp-shield",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "description": "Production-grade resilience middleware for MCP servers — timeout, retry, circuit breaker.",
   "bin": {
     "mcp-shield": "./dist/cli.js"
