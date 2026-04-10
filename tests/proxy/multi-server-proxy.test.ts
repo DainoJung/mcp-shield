@@ -7,13 +7,13 @@ import type { JsonRpcMessage, JsonRpcResponse } from "../../src/proxy/types.js";
 const MOCK_SERVER_PATH = resolve(__dirname, "../helpers/mock-server.ts");
 
 function spawnMockServer(): ChildProcess {
-  return spawn("npx", ["tsx", MOCK_SERVER_PATH], {
+  return spawn("./node_modules/.bin/tsx", [MOCK_SERVER_PATH], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 }
 
 /** Wait for mock server to emit "started" on stderr. */
-function waitForReady(child: ChildProcess, timeoutMs = 10000): Promise<void> {
+function waitForReady(child: ChildProcess, timeoutMs = 30000): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Server startup timed out")), timeoutMs);
     const onData = (chunk: Buffer) => {
