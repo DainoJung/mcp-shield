@@ -61,6 +61,11 @@ const toolFilterSchema = z.object({
   deny: z.array(z.string()).optional(),
 }).optional();
 
+const rateLimitSchema = z.object({
+  max_calls: z.number().int().positive(),
+  window: durationSchema,
+}).optional();
+
 const serverConfigSchema = z.object({
   command: z.string().min(1, "Server command is required"),
   env: z.record(z.string()).optional(),
@@ -70,6 +75,7 @@ const serverConfigSchema = z.object({
   logging: loggingConfigSchema,
   tools: z.record(toolOverrideSchema).optional(),
   tool_filter: toolFilterSchema,
+  rate_limit: rateLimitSchema,
 });
 
 export const configSchema = z.object({

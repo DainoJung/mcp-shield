@@ -48,6 +48,11 @@ export {
   isToolAllowed,
   type ToolFilterConfig,
 } from "./middleware/tool-filter.js";
+export {
+  createRateLimiterMiddleware,
+  RateLimiter,
+  type RateLimitConfig,
+} from "./middleware/rate-limiter.js";
 export type { MiddlewareFn, MiddlewareContext, NextFn } from "./middleware/types.js";
 
 export { BUILT_IN_DEFAULTS, mergeConfigs, type ResolvedToolConfig } from "./config/defaults.js";
