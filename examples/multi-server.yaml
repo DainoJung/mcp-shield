@@ -1,0 +1,32 @@
+defaults:
+  timeout: 30s
+  retries:
+    max: 3
+    backoff: exponential
+    base_delay: 1s
+    max_delay: 30s
+    jitter: true
+  circuit_breaker:
+    threshold: 5
+    reset_after: 60s
+  logging:
+    level: info
+    format: json
+
+servers:
+  github:
+    command: "npx @modelcontextprotocol/server-github"
+    env:
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    tools:
+      get_file_contents:
+        timeout: 60s
+      search_repositories:
+        retries:
+          max: 5
+
+  filesystem:
+    command: "npx @modelcontextprotocol/server-filesystem /home/user"
+    timeout: 10s
+    retries:
+      max: 1

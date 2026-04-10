@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test
+coverage/
+
+# Environment & secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code / OMC
+CLAUDE.md
+TECHNICAL_SPEC.md
+.omc/
+
+# Logs
+*.log
