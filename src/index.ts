@@ -36,6 +36,12 @@ export {
   createLoggerMiddleware,
   createCircuitBreakerLogger,
 } from "./middleware/logger.js";
+export {
+  createResponseValidatorMiddleware,
+  validateToolResponse,
+  type ValidationMode,
+  type ValidationResult,
+} from "./middleware/response-validator.js";
 export type { MiddlewareFn, MiddlewareContext, NextFn } from "./middleware/types.js";
 
 export { BUILT_IN_DEFAULTS, mergeConfigs, type ResolvedToolConfig } from "./config/defaults.js";
