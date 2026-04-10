@@ -264,8 +264,10 @@ export class MultiServerProxy extends EventEmitter {
       const pending = server.pendingRequests.get(msg.id)!;
       server.pendingRequests.delete(msg.id);
       pending.resolve(msg);
+    } else if (!isResponse(msg)) {
+      // Forward notifications from child servers to the agent
+      this.sendToAgent(msg);
     }
-    // Drop other server messages (notifications etc.)
   }
 
   private sendToServerAndWait(serverName: string, request: JsonRpcRequest): Promise<JsonRpcResponse> {

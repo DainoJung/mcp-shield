@@ -4,26 +4,24 @@ import { makeErrorResponse, ErrorCodes } from "../proxy/types.js";
 export function createTimeoutMiddleware(): MiddlewareFn {
   return async (ctx, next) => {
     const timeoutMs = ctx.config.timeout;
-    const controller = new AbortController();
+    let timedOut = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        reject(new Error("TIMEOUT"));
+      }, timeoutMs);
+    });
 
     try {
-      const response = await Promise.race([
-        next(),
-        new Promise<never>((_, reject) => {
-          controller.signal.addEventListener("abort", () => {
-            reject(new Error("TIMEOUT"));
-          });
-        }),
-      ]);
-
-      clearTimeout(timeoutId);
+      const response = await Promise.race([next(), timeoutPromise]);
+      clearTimeout(timeoutId!);
       return response;
     } catch (err) {
-      clearTimeout(timeoutId);
+      clearTimeout(timeoutId!);
 
-      if (err instanceof Error && err.message === "TIMEOUT") {
+      if (timedOut) {
         return makeErrorResponse(
           ctx.request.id,
           ErrorCodes.TIMEOUT,

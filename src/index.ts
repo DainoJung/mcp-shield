@@ -28,8 +28,10 @@ export { createTimeoutMiddleware } from "./middleware/timeout.js";
 export { createRetryMiddleware } from "./middleware/retry.js";
 export {
   createCircuitBreakerMiddleware,
+  CircuitBreakerStore,
   resetAllCircuitBreakers,
   getCircuitState,
+  type CircuitState,
 } from "./middleware/circuit-breaker.js";
 export {
   createLogger,
@@ -72,16 +74,19 @@ export {
  */
 export function shield(options: {
   command: string;
+  args?: string[];
   timeout?: number;
   retries?: { max?: number; backoff?: "exponential" | "linear" | "fixed"; jitter?: boolean };
   circuitBreaker?: { threshold?: number; resetAfter?: number };
   logLevel?: string;
   logFormat?: "json" | "pretty";
 }): StdioProxy {
-  const parts = options.command.split(/\s+/);
+  // If args provided, use them directly. Otherwise split command string.
+  const command = options.args ? options.command : options.command.split(/\s+/)[0]!;
+  const args = options.args ?? options.command.split(/\s+/).slice(1);
   const serverConfig = buildInlineServerConfig({
-    command: parts[0]!,
-    args: parts.slice(1),
+    command,
+    args,
     timeout: options.timeout,
     retries: options.retries?.max,
     logLevel: options.logLevel,

@@ -135,8 +135,12 @@ export class StdioProxy extends EventEmitter {
 
     try {
       const response = await this.options.middleware(ctx, () => this.forwardAndWait(request));
+      // Clean up pending request if middleware returned early (e.g. timeout)
+      // The underlying next() promise may still be waiting for the server
+      this.pendingRequests.delete(request.id);
       this.sendToAgent(response);
     } catch (err) {
+      this.pendingRequests.delete(request.id);
       const message = err instanceof Error ? err.message : String(err);
       this.sendToAgent(
         makeErrorResponse(request.id, -32000, `Middleware error: ${message}`),

@@ -166,14 +166,15 @@ Use `--log-format pretty` for human-readable output during development.
 ```typescript
 import { shield } from 'mcp-shield';
 
-const server = shield({
-  command: 'npx @modelcontextprotocol/server-github',
+const proxy = shield({
+  command: 'npx',
+  args: ['@modelcontextprotocol/server-github'],
   timeout: 30_000,
   retries: { max: 3, backoff: 'exponential', jitter: true },
   circuitBreaker: { threshold: 5, resetAfter: 60_000 },
 });
 
-// server is a ChildProcess with mcp-shield proxy
+proxy.start(); // starts the proxy and child MCP server
 ```
 
 ## Why mcp-shield?

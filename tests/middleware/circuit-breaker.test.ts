@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   createCircuitBreakerMiddleware,
-  resetAllCircuitBreakers,
-  getCircuitState,
+  CircuitBreakerStore,
 } from "../../src/middleware/circuit-breaker.js";
 import { ErrorCodes, type JsonRpcResponse } from "../../src/proxy/types.js";
 import type { MiddlewareContext } from "../../src/middleware/types.js";
@@ -32,36 +31,36 @@ function errorResponse(): JsonRpcResponse {
 }
 
 describe("circuit breaker middleware", () => {
+  let store: CircuitBreakerStore;
+
   beforeEach(() => {
-    resetAllCircuitBreakers();
+    store = new CircuitBreakerStore();
   });
 
-  const middleware = createCircuitBreakerMiddleware();
-
   it("passes through in closed state", async () => {
+    const mw = createCircuitBreakerMiddleware(undefined, store);
     const ctx = makeCtx();
-    const result = await middleware(ctx, async () => successResponse());
+    const result = await mw(ctx, async () => successResponse());
     expect(result.result).toBeDefined();
-    expect(getCircuitState("test-server")).toBe("closed");
+    expect(store.getState("test-server")).toBe("closed");
   });
 
   it("opens after reaching failure threshold", async () => {
+    const mw = createCircuitBreakerMiddleware(undefined, store);
     for (let i = 0; i < 3; i++) {
-      const ctx = makeCtx();
-      await middleware(ctx, async () => errorResponse());
+      await mw(makeCtx(), async () => errorResponse());
     }
-    expect(getCircuitState("test-server")).toBe("open");
+    expect(store.getState("test-server")).toBe("open");
   });
 
   it("rejects immediately when circuit is open", async () => {
-    // Trip the circuit
+    const mw = createCircuitBreakerMiddleware(undefined, store);
     for (let i = 0; i < 3; i++) {
-      await middleware(makeCtx(), async () => errorResponse());
+      await mw(makeCtx(), async () => errorResponse());
     }
 
-    // Next request should be rejected without calling next
     let nextCalled = false;
-    const result = await middleware(makeCtx(), async () => {
+    const result = await mw(makeCtx(), async () => {
       nextCalled = true;
       return successResponse();
     });
@@ -72,66 +71,60 @@ describe("circuit breaker middleware", () => {
   });
 
   it("transitions to half-open after reset_after", async () => {
-    // Trip the circuit
+    const mw = createCircuitBreakerMiddleware(undefined, store);
     for (let i = 0; i < 3; i++) {
-      await middleware(makeCtx(), async () => errorResponse());
+      await mw(makeCtx(), async () => errorResponse());
     }
-    expect(getCircuitState("test-server")).toBe("open");
+    expect(store.getState("test-server")).toBe("open");
 
-    // Wait for reset_after
     await new Promise((r) => setTimeout(r, 150));
 
-    // Next request should go through (half-open)
     let nextCalled = false;
-    await middleware(makeCtx(), async () => {
+    await mw(makeCtx(), async () => {
       nextCalled = true;
       return successResponse();
     });
     expect(nextCalled).toBe(true);
-    expect(getCircuitState("test-server")).toBe("closed");
+    expect(store.getState("test-server")).toBe("closed");
   });
 
   it("re-opens on half-open failure", async () => {
-    // Trip the circuit
+    const mw = createCircuitBreakerMiddleware(undefined, store);
     for (let i = 0; i < 3; i++) {
-      await middleware(makeCtx(), async () => errorResponse());
+      await mw(makeCtx(), async () => errorResponse());
     }
 
-    // Wait for reset_after
     await new Promise((r) => setTimeout(r, 150));
 
-    // Fail during half-open
-    await middleware(makeCtx(), async () => errorResponse());
-    expect(getCircuitState("test-server")).toBe("open");
+    await mw(makeCtx(), async () => errorResponse());
+    expect(store.getState("test-server")).toBe("open");
   });
 
   it("resets failure count on success", async () => {
-    // 2 failures (below threshold of 3)
-    await middleware(makeCtx(), async () => errorResponse());
-    await middleware(makeCtx(), async () => errorResponse());
-
-    // Success resets the counter
-    await middleware(makeCtx(), async () => successResponse());
-
-    // 2 more failures — should NOT open (counter was reset)
-    await middleware(makeCtx(), async () => errorResponse());
-    await middleware(makeCtx(), async () => errorResponse());
-    expect(getCircuitState("test-server")).toBe("closed");
+    const mw = createCircuitBreakerMiddleware(undefined, store);
+    await mw(makeCtx(), async () => errorResponse());
+    await mw(makeCtx(), async () => errorResponse());
+    await mw(makeCtx(), async () => successResponse());
+    await mw(makeCtx(), async () => errorResponse());
+    await mw(makeCtx(), async () => errorResponse());
+    expect(store.getState("test-server")).toBe("closed");
   });
 
-  it("maintains per-server state", async () => {
-    const mw = createCircuitBreakerMiddleware();
+  it("maintains per-server state with isolated stores", async () => {
+    const storeA = new CircuitBreakerStore();
+    const storeB = new CircuitBreakerStore();
+    const mwA = createCircuitBreakerMiddleware(undefined, storeA);
+    const mwB = createCircuitBreakerMiddleware(undefined, storeB);
 
     // Trip circuit for server-a
     for (let i = 0; i < 3; i++) {
-      await mw(makeCtx({ serverName: "server-a" }), async () => errorResponse());
+      await mwA(makeCtx({ serverName: "server-a" }), async () => errorResponse());
     }
 
-    expect(getCircuitState("server-a")).toBe("open");
-    expect(getCircuitState("server-b")).toBe("closed");
+    expect(storeA.getState("server-a")).toBe("open");
+    expect(storeB.getState("server-a")).toBe("closed"); // different store, unaffected
 
-    // server-b should still work
-    const result = await mw(makeCtx({ serverName: "server-b" }), async () => successResponse());
+    const result = await mwB(makeCtx({ serverName: "server-a" }), async () => successResponse());
     expect(result.result).toBeDefined();
   });
 });

@@ -39,6 +39,12 @@
     "ai-agent",
     "agentic-ai"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DainoJung/mcp-shield.git"
+  },
+  "homepage": "https://github.com/DainoJung/mcp-shield",
+  "author": "DainoJung",
   "license": "MIT",
   "engines": {
     "node": ">=20"

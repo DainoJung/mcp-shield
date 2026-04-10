@@ -12,6 +12,20 @@ function spawnMockServer(): ChildProcess {
   });
 }
 
+function waitForReady(child: ChildProcess, timeoutMs = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Server startup timed out")), timeoutMs);
+    const onData = (chunk: Buffer) => {
+      if (chunk.toString().includes("started")) {
+        clearTimeout(timer);
+        child.stderr!.off("data", onData);
+        resolve();
+      }
+    };
+    child.stderr!.on("data", onData);
+  });
+}
+
 function sendAndReceive(
   child: ChildProcess,
   msg: JsonRpcMessage,
@@ -48,7 +62,7 @@ describe("e2e: mock MCP server", () => {
   it("handles initialize request", async () => {
     server = spawnMockServer();
     // Wait for server to start
-    await new Promise((r) => setTimeout(r, 500));
+    await waitForReady(server);
 
     const resp = await sendAndReceive(server, {
       jsonrpc: "2.0",
@@ -64,7 +78,7 @@ describe("e2e: mock MCP server", () => {
 
   it("handles tools/call echo action", async () => {
     server = spawnMockServer();
-    await new Promise((r) => setTimeout(r, 500));
+    await waitForReady(server);
 
     const resp = await sendAndReceive(server, {
       jsonrpc: "2.0",
@@ -83,7 +97,7 @@ describe("e2e: mock MCP server", () => {
 
   it("handles tools/call error action", async () => {
     server = spawnMockServer();
-    await new Promise((r) => setTimeout(r, 500));
+    await waitForReady(server);
 
     const resp = await sendAndReceive(server, {
       jsonrpc: "2.0",
@@ -101,7 +115,7 @@ describe("e2e: mock MCP server", () => {
 
   it("handles tools/call delay action", async () => {
     server = spawnMockServer();
-    await new Promise((r) => setTimeout(r, 500));
+    await waitForReady(server);
 
     const start = Date.now();
     const resp = await sendAndReceive(server, {
@@ -121,7 +135,7 @@ describe("e2e: mock MCP server", () => {
 
   it("handles multiple sequential requests", async () => {
     server = spawnMockServer();
-    await new Promise((r) => setTimeout(r, 500));
+    await waitForReady(server);
 
     for (let i = 1; i <= 3; i++) {
       const resp = await sendAndReceive(server, {

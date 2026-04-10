@@ -1,51 +1,57 @@
 import type { MiddlewareFn } from "./types.js";
 import { makeErrorResponse, ErrorCodes } from "../proxy/types.js";
 
-type CircuitState = "closed" | "open" | "half-open";
+export type CircuitState = "closed" | "open" | "half-open";
 
-interface CircuitBreakerState {
+interface CircuitBreakerEntry {
   state: CircuitState;
   failures: number;
   lastFailureTime: number;
-}
-
-/** Per-server circuit breaker state store. */
-const serverStates = new Map<string, CircuitBreakerState>();
-
-function getState(serverName: string): CircuitBreakerState {
-  let state = serverStates.get(serverName);
-  if (!state) {
-    state = { state: "closed", failures: 0, lastFailureTime: 0 };
-    serverStates.set(serverName, state);
-  }
-  return state;
-}
-
-/** Reset all circuit breaker state (for testing). */
-export function resetAllCircuitBreakers(): void {
-  serverStates.clear();
-}
-
-/** Get current circuit state for a server (for testing/inspection). */
-export function getCircuitState(serverName: string): CircuitState {
-  return getState(serverName).state;
 }
 
 export interface CircuitBreakerEvents {
   onStateChange?: (serverName: string, from: CircuitState, to: CircuitState, failures: number) => void;
 }
 
-export function createCircuitBreakerMiddleware(events?: CircuitBreakerEvents): MiddlewareFn {
-  return async (ctx, next) => {
-    const { threshold, reset_after } = ctx.config.circuit_breaker;
-    const cbState = getState(ctx.serverName);
+/**
+ * Instance-scoped circuit breaker state store.
+ * Each call to createCircuitBreakerMiddleware gets its own isolated state.
+ */
+export class CircuitBreakerStore {
+  private states = new Map<string, CircuitBreakerEntry>();
 
-    // Check if circuit is open
-    if (cbState.state === "open") {
-      const elapsed = Date.now() - cbState.lastFailureTime;
+  get(serverName: string): CircuitBreakerEntry {
+    let entry = this.states.get(serverName);
+    if (!entry) {
+      entry = { state: "closed", failures: 0, lastFailureTime: 0 };
+      this.states.set(serverName, entry);
+    }
+    return entry;
+  }
+
+  getState(serverName: string): CircuitState {
+    return this.get(serverName).state;
+  }
+
+  reset(): void {
+    this.states.clear();
+  }
+}
+
+export function createCircuitBreakerMiddleware(
+  events?: CircuitBreakerEvents,
+  store?: CircuitBreakerStore,
+): MiddlewareFn & { store: CircuitBreakerStore } {
+  const cbStore = store ?? new CircuitBreakerStore();
+
+  const middleware: MiddlewareFn = async (ctx, next) => {
+    const { threshold, reset_after } = ctx.config.circuit_breaker;
+    const entry = cbStore.get(ctx.serverName);
+
+    if (entry.state === "open") {
+      const elapsed = Date.now() - entry.lastFailureTime;
       if (elapsed >= reset_after) {
-        // Transition to half-open
-        transition(cbState, "half-open", ctx.serverName, events);
+        transition(entry, "half-open", ctx.serverName, events);
       } else {
         return makeErrorResponse(
           ctx.request.id,
@@ -55,7 +61,7 @@ export function createCircuitBreakerMiddleware(events?: CircuitBreakerEvents): M
             type: "circuit_breaker",
             server: ctx.serverName,
             state: "open",
-            failures: cbState.failures,
+            failures: entry.failures,
             reset_after_ms: reset_after,
           },
         );
@@ -65,39 +71,49 @@ export function createCircuitBreakerMiddleware(events?: CircuitBreakerEvents): M
     const response = await next();
 
     if (response.error) {
-      cbState.failures++;
-      cbState.lastFailureTime = Date.now();
+      entry.failures++;
+      entry.lastFailureTime = Date.now();
 
-      if (cbState.state === "half-open") {
-        // Half-open failure → back to open
-        transition(cbState, "open", ctx.serverName, events);
-      } else if (cbState.failures >= threshold) {
-        // Threshold reached → open
-        transition(cbState, "open", ctx.serverName, events);
+      if (entry.state === "half-open") {
+        transition(entry, "open", ctx.serverName, events);
+      } else if (entry.failures >= threshold) {
+        transition(entry, "open", ctx.serverName, events);
       }
     } else {
-      // Success
-      if (cbState.state === "half-open") {
-        // Half-open success → closed
-        cbState.failures = 0;
-        transition(cbState, "closed", ctx.serverName, events);
+      if (entry.state === "half-open") {
+        entry.failures = 0;
+        transition(entry, "closed", ctx.serverName, events);
       } else {
-        // Reset consecutive failure count on success
-        cbState.failures = 0;
+        entry.failures = 0;
       }
     }
 
     return response;
   };
+
+  return Object.assign(middleware, { store: cbStore });
 }
 
 function transition(
-  state: CircuitBreakerState,
+  entry: CircuitBreakerEntry,
   to: CircuitState,
   serverName: string,
   events?: CircuitBreakerEvents,
 ): void {
-  const from = state.state;
-  state.state = to;
-  events?.onStateChange?.(serverName, from, to, state.failures);
+  const from = entry.state;
+  entry.state = to;
+  events?.onStateChange?.(serverName, from, to, entry.failures);
+}
+
+// Backwards-compatible helpers that use a shared default store
+const defaultStore = new CircuitBreakerStore();
+
+/** @deprecated Use CircuitBreakerStore instance instead */
+export function resetAllCircuitBreakers(): void {
+  defaultStore.reset();
+}
+
+/** @deprecated Use CircuitBreakerStore instance instead */
+export function getCircuitState(serverName: string): CircuitState {
+  return defaultStore.getState(serverName);
 }

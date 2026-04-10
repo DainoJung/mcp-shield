@@ -2,14 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import { MessageParser, encodeMessage } from "../../src/proxy/message-parser.js";
-import type { JsonRpcMessage, JsonRpcResponse, JsonRpcRequest } from "../../src/proxy/types.js";
-
-/**
- * Test multi-server concept by verifying that two mock servers
- * can run simultaneously and respond to different tool calls.
- * (Full MultiServerProxy integration requires stdio takeover,
- * so we test the routing logic via the underlying components.)
- */
+import type { JsonRpcMessage, JsonRpcResponse } from "../../src/proxy/types.js";
 
 const MOCK_SERVER_PATH = resolve(__dirname, "../helpers/mock-server.ts");
 
@@ -19,13 +12,28 @@ function spawnMockServer(): ChildProcess {
   });
 }
 
+/** Wait for mock server to emit "started" on stderr. */
+function waitForReady(child: ChildProcess, timeoutMs = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Server startup timed out")), timeoutMs);
+    const onData = (chunk: Buffer) => {
+      if (chunk.toString().includes("started")) {
+        clearTimeout(timer);
+        child.stderr!.off("data", onData);
+        resolve();
+      }
+    };
+    child.stderr!.on("data", onData);
+  });
+}
+
 function sendAndReceive(
   child: ChildProcess,
   msg: JsonRpcMessage,
   timeoutMs = 5000,
 ): Promise<JsonRpcResponse> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Timed out")), timeoutMs);
+    const timer = setTimeout(() => reject(new Error("Timed out waiting for response")), timeoutMs);
     const parser = new MessageParser();
     const onData = (chunk: Buffer) => parser.feed(chunk);
 
@@ -54,9 +62,8 @@ describe("multi-server: parallel mock servers", () => {
     const server1 = spawnMockServer();
     const server2 = spawnMockServer();
     servers.push(server1, server2);
-    await new Promise((r) => setTimeout(r, 500));
+    await Promise.all([waitForReady(server1), waitForReady(server2)]);
 
-    // Both can initialize
     const init1 = await sendAndReceive(server1, {
       jsonrpc: "2.0", id: 1, method: "initialize", params: {},
     });
@@ -71,7 +78,7 @@ describe("multi-server: parallel mock servers", () => {
     const server1 = spawnMockServer();
     const server2 = spawnMockServer();
     servers.push(server1, server2);
-    await new Promise((r) => setTimeout(r, 500));
+    await Promise.all([waitForReady(server1), waitForReady(server2)]);
 
     const resp1 = await sendAndReceive(server1, {
       jsonrpc: "2.0", id: 10, method: "tools/call",
@@ -94,17 +101,12 @@ describe("multi-server: parallel mock servers", () => {
     const fastServer = spawnMockServer();
     const slowServer = spawnMockServer();
     servers.push(fastServer, slowServer);
-    await new Promise((r) => setTimeout(r, 500));
+    await Promise.all([waitForReady(fastServer), waitForReady(slowServer)]);
 
-    const start = Date.now();
-
-    // Fast server: instant echo
     const fast = await sendAndReceive(fastServer, {
       jsonrpc: "2.0", id: 1, method: "tools/call",
       params: { name: "test_tool", arguments: { action: "echo", data: "fast" } },
     });
-
-    // Slow server: 200ms delay
     const slow = await sendAndReceive(slowServer, {
       jsonrpc: "2.0", id: 2, method: "tools/call",
       params: { name: "test_tool", arguments: { action: "delay", ms: 200 } },
@@ -118,7 +120,7 @@ describe("multi-server: parallel mock servers", () => {
     const server1 = spawnMockServer();
     const server2 = spawnMockServer();
     servers.push(server1, server2);
-    await new Promise((r) => setTimeout(r, 500));
+    await Promise.all([waitForReady(server1), waitForReady(server2)]);
 
     const list1 = await sendAndReceive(server1, {
       jsonrpc: "2.0", id: 1, method: "tools/list",
@@ -129,8 +131,6 @@ describe("multi-server: parallel mock servers", () => {
 
     const tools1 = (list1.result as any).tools as Array<{ name: string }>;
     const tools2 = (list2.result as any).tools as Array<{ name: string }>;
-
-    // Merge
     const merged = [...tools1, ...tools2];
     expect(merged.length).toBe(tools1.length + tools2.length);
     expect(merged.some((t) => t.name === "test_tool")).toBe(true);
