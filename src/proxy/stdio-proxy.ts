@@ -5,6 +5,7 @@ import {
   type JsonRpcMessage,
   type JsonRpcRequest,
   type JsonRpcResponse,
+  isRequest,
   isToolsCall,
   isResponse,
   makeErrorResponse,
@@ -12,6 +13,7 @@ import {
 } from "./types.js";
 import type { MiddlewareFn, MiddlewareContext } from "../middleware/types.js";
 import type { ResolvedToolConfig } from "../config/defaults.js";
+import { filterToolListResponse, type ToolFilterConfig } from "../middleware/tool-filter.js";
 
 export interface StdioProxyOptions {
   command: string;
@@ -20,6 +22,7 @@ export interface StdioProxyOptions {
   serverName: string;
   middleware: MiddlewareFn;
   resolveToolConfig: (toolName: string) => ResolvedToolConfig;
+  toolFilter?: ToolFilterConfig;
 }
 
 export class StdioProxy extends EventEmitter {
@@ -30,6 +33,7 @@ export class StdioProxy extends EventEmitter {
     number | string,
     { resolve: (resp: JsonRpcResponse) => void; reject: (err: Error) => void }
   >();
+  private pendingToolsList = new Set<number | string>();
   private readonly options: StdioProxyOptions;
 
   constructor(options: StdioProxyOptions) {
@@ -102,6 +106,14 @@ export class StdioProxy extends EventEmitter {
   private handleAgentMessage(msg: JsonRpcMessage): void {
     if (isToolsCall(msg)) {
       this.handleToolsCall(msg);
+    } else if (
+      this.options.toolFilter &&
+      isRequest(msg) &&
+      msg.method === "tools/list"
+    ) {
+      // Track tools/list requests so we can filter the response
+      this.pendingToolsList.add(msg.id);
+      this.forwardToServer(msg);
     } else {
       // Forward non-tools/call messages directly to child
       this.forwardToServer(msg);
@@ -144,6 +156,13 @@ export class StdioProxy extends EventEmitter {
       const pending = this.pendingRequests.get(msg.id)!;
       this.pendingRequests.delete(msg.id);
       pending.resolve(msg);
+    } else if (isResponse(msg) && this.pendingToolsList.has(msg.id)) {
+      // Filter tools/list responses
+      this.pendingToolsList.delete(msg.id);
+      const filtered = this.options.toolFilter
+        ? filterToolListResponse(msg, this.options.toolFilter)
+        : msg;
+      this.sendToAgent(filtered);
     } else {
       // Forward non-pending messages (notifications, other responses) to agent
       this.sendToAgent(msg);

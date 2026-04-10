@@ -56,6 +56,11 @@ const toolOverrideSchema = z.object({
   retries: retryConfigSchema,
 }).strict();
 
+const toolFilterSchema = z.object({
+  allow: z.array(z.string()).optional(),
+  deny: z.array(z.string()).optional(),
+}).optional();
+
 const serverConfigSchema = z.object({
   command: z.string().min(1, "Server command is required"),
   env: z.record(z.string()).optional(),
@@ -64,6 +69,7 @@ const serverConfigSchema = z.object({
   circuit_breaker: circuitBreakerConfigSchema,
   logging: loggingConfigSchema,
   tools: z.record(toolOverrideSchema).optional(),
+  tool_filter: toolFilterSchema,
 });
 
 export const configSchema = z.object({
